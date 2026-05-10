@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shivox - AI Assistant</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0d0d0d;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .splash {
+            position: fixed; inset: 0; background: #0d0d0d;
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100; transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s;
+        }
+
+        .splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        .splash-content { text-align: center; }
+
+        .splash-mark {
+            width: 64px; height: 64px; margin: 0 auto 32px;
+            border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 50%;
+            position: relative; animation: rotate 8s linear infinite;
+        }
+
+        .splash-mark::before {
+            content: ''; position: absolute; top: -2px; left: 50%;
+            transform: translateX(-50%); width: 4px; height: 4px;
+            background: #ffffff; border-radius: 50%;
+        }
+
+        .splash-mark::after {
+            content: ''; position: absolute; inset: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%;
+            animation: rotate 4s linear infinite reverse;
+        }
+
+        @keyframes rotate { to { transform: rotate(360deg); } }
+
+        .splash-title {
+            font-size: 28px; font-weight: 500; color: #ffffff;
+            letter-spacing: 6px; text-transform: uppercase; margin-bottom: 8px;
+        }
+
+        .splash-subtitle { font-size: 12px; color: #555; letter-spacing: 3px; text-transform: uppercase; }
+
+        .splash-line {
+            width: 60px; height: 1px; background: rgba(255, 255, 255, 0.2);
+            margin: 32px auto 0; position: relative; overflow: hidden;
+        }
+
+        .splash-line::after {
+            content: ''; position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; background: #ffffff;
+            animation: lineFill 2.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            transform: translateX(-100%);
+        }
+
+        @keyframes lineFill { to { transform: translateX(0); } }
+
+        .app {
+            width: 100%; max-width: 720px; height: 100vh; max-height: 700px;
+            background: #0d0d0d; display: flex; flex-direction: column;
+            opacity: 0; transform: translateY(20px);
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s, transform 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+        }
+
+        .app.visible { opacity: 1; transform: translateY(0); }
+
+        .header {
+            padding: 20px 28px; display: flex; align-items: center;
+            justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .header-left { display: flex; align-items: center; gap: 12px; }
+
+        .header-indicator {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #4ade80; box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+        }
+
+        .header-name { font-size: 15px; font-weight: 500; color: #ffffff; letter-spacing: 0.5px; }
+        .header-status { font-size: 11px; color: #555; letter-spacing: 0.5px; }
+        .header-actions { display: flex; gap: 16px; }
+
+        .header-btn {
+            background: none; border: none; color: #555; cursor: pointer;
+            font-size: 13px; font-family: 'Inter', sans-serif; letter-spacing: 0.5px;
+            padding: 6px 12px; border-radius: 4px; transition: all 0.2s;
+        }
+
+        .header-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.04); }
+
+        .messages {
+            flex: 1; overflow-y: auto; padding: 24px 28px; scroll-behavior: smooth;
+        }
+
+        .messages::-webkit-scrollbar { width: 4px; }
+        .messages::-webkit-scrollbar-track { background: transparent; }
+        .messages::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 2px; }
+
+        .message { margin-bottom: 28px; animation: msgIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-user { display: flex; justify-content: flex-end; }
+
+        .msg-content { max-width: 80%; font-size: 14px; line-height: 1.7; letter-spacing: 0.2px; }
+        .message-bot .msg-content { color: #d4d4d4; }
+
+        .message-user .msg-content {
+            color: #ffffff; background: rgba(255, 255, 255, 0.06);
+            border-radius: 12px; padding: 12px 16px;
+        }
+
+        .msg-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #444; margin-bottom: 6px; }
+        .message-user .msg-label { text-align: right; }
+
+        .typing { display: none; margin-bottom: 28px; }
+        .typing-dots { display: flex; gap: 5px; padding: 4px 0; }
+
+        .typing-dots span {
+            width: 5px; height: 5px; border-radius: 50%;
+            background: #444; animation: dotPulse 1.4s infinite;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes dotPulse {
+            0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+            30% { opacity: 1; transform: scale(1); }
+        }
+
+        .input-area { padding: 16px 28px 24px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+
+        .input-row { display: flex; gap: 10px; align-items: center; }
+
+        .input-field {
+            flex: 1; background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;
+            padding: 12px 16px; font-size: 14px; color: #ffffff;
+            font-family: 'Inter', sans-serif; letter-spacing: 0.2px;
+            outline: none; transition: all 0.2s;
+        }
+
+        .input-field:focus {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .input-field::placeholder { color: #444; }
+
+        .btn-send {
+            background: #ffffff; color: #0d0d0d; border: none;
+            padding: 12px 20px; border-radius: 8px; font-size: 13px;
+            font-weight: 500; font-family: 'Inter', sans-serif;
+            letter-spacing: 0.5px; cursor: pointer; transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-send:hover { background: #e0e0e0; }
+        .btn-send:active { transform: scale(0.97); }
+
+        .prompts { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+        .prompt-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06); color: #666;
+            padding: 6px 14px; border-radius: 6px; font-size: 12px;
+            font-family: 'Inter', sans-serif; cursor: pointer;
+            letter-spacing: 0.3px; transition: all 0.2s; white-space: nowrap;
+        }
+
+        .prompt-btn:hover {
+            background: rgba(255, 255, 255, 0.06); color: #999;
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        /* About Section */
+        .about-section {
+            padding: 8px 28px 12px; border-top: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .about-text {
+            font-size: 10px; color: #3a3a3a; letter-spacing: 0.3px;
+            text-align: center; line-height: 1.5;
+        }
+
+        .about-text span { color: #555; }
+
+        @media (max-width: 600px) {
+            .app { max-height: 100vh; }
+            .msg-content { max-width: 90%; }
+            .header { padding: 16px 20px; }
+            .messages { padding: 20px; }
+            .input-area { padding: 12px 20px 20px; }
+            .about-section { padding: 6px 20px 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Splash Screen -->
+    <div class="splash" id="splash">
+        <div class="splash-content">
+            <div class="splash-mark"></div>
+            <div class="splash-title">Shivox</div>
+            <div class="splash-subtitle">Intelligent Assistant</div>
+            <div class="splash-line"></div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app" id="app">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <div class="header-indicator"></div>
+                <div>
+                    <div class="header-name">Shivox</div>
+                    <div class="header-status">Active</div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="header-btn" onclick="clearChat()" title="New conversation">Clear</button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="messages" id="messages">
+            <div class="message message-bot">
+                <div class="msg-label">Shivox</div>
+                <div class="msg-content">
+                    Hello, I am Shivox. How can I assist you today?
+                </div>
+            </div>
+        </div>
+
+        <!-- Typing -->
+        <div class="typing" id="typing">
+            <div class="msg-label">Shivox</div>
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <div class="input-row">
+                <input 
+                    type="text" 
+                    class="input-field" 
+                    id="userInput" 
+                    placeholder="Type your message..."
+                    autocomplete="off"
+                >
+                <button class="btn-send" id="sendBtn">Send</button>
+            </div>
+            <div class="prompts">
+                <button class="prompt-btn" onclick="quickAsk('Explain quantum computing in simple terms')">Quantum Computing</button>
+                <button class="prompt-btn" onclick="quickAsk('Write a professional email template')">Email Draft</button>
+                <button class="prompt-btn" onclick="quickAsk('Suggest a productive morning routine')">Productivity</button>
+                <button class="prompt-btn" onclick="quickAsk('What are the latest trends in AI?')">AI Trends</button>
+            </div>
+        </div>
+
+        <!-- About Section -->
+        <div class="about-section">
+            <div class="about-text">
+                Powered by <span>NVIDIA Nemotron 3 Super</span> &middot; Developed by <span>Shiva Sharma</span> for <span>Shivox</span> &middot; Category: <span>AI Assistant / Education</span>
+            </div>
+            <div class="about-text" style="margin-top: 2px;">
+                Fast, multilingual, and designed for deep understanding and learning.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== CONFIGURATION ==========
+        const API_KEY = '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';
+        const MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
+        const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+        
+        // About info for system prompt
+        const ABOUT_INFO = {
+            name: 'Shivox',
+            developer: 'Shiva Sharma',
+            category: 'AI Assistant / Education',
+            powered_by: 'NVIDIA Nemotron 3 Super',
+            features: 'Fast, multilingual, deep understanding, long memory (1M context)',
+            origin: 'Indian'
+        };
+        
+        let chatHistory = [];
+
+        // Splash
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('splash').classList.add('hide');
+                document.getElementById('app').classList.add('visible');
+                document.getElementById('userInput').focus();
+            }, 2400);
+        });
+
+        // API Call via OpenRouter
+        async function askShivox(message) {
+            const systemPrompt = `You are ${ABOUT_INFO.name}, a professional, intelligent, and friendly AI assistant.
+
+About You:
+- Developed by: ${ABOUT_INFO.developer}
+- Category: ${ABOUT_INFO.category}
+- Powered by: ${ABOUT_INFO.powered_by}
+- Origin: ${ABOUT_INFO.origin}
+- Key Features: ${ABOUT_INFO.features}
+
+Rules:
+- No emojis. Ever.
+- Use clear, concise language.
+- Be warm but professional. Like a smart Indian colleague.
+- If asked who created you: "I was created by Shiva Sharma, an Indian developer."
+- If asked about your capabilities: Mention your fast speed, multilingual support, deep understanding, and 1 million token memory.
+- Respond thoughtfully. Quality over quantity.
+- Use plain text only. No markdown, no symbols, no decorative elements.`;
+
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'HTTP-Referer': window.location.href,
+                    'X-Title': '${ABOUT_INFO.name} AI'
+                },
+                body: JSON.stringify({
+                    model: MODEL,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        ...chatHistory.slice(-6),
+                        { role: 'user', content: message }
+                    ],
+                    temperature: 0.85,
+                    max_tokens: 600,
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.choices && data.choices[0]) {
+                return data.choices[0].message.content;
+            } else {
+                throw new Error('No response from API');
+            }
+        }
+
+        // Add message
+        function addMessage(text, isUser) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${isUser ? 'message-user' : 'message-bot'}`;
+            
+            const cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+            
+            div.innerHTML = `
+                <div class="msg-label">${isUser ? 'You' : '${ABOUT_INFO.name}'}</div>
+                <div class="msg-content">${cleanText}</div>
+            `;
+            
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+
+            chatHistory.push({
+                role: isUser ? 'user' : 'assistant',
+                content: cleanText
+            });
+
+            if (chatHistory.length > 20) {
+                chatHistory = chatHistory.slice(-20);
+            }
+        }
+
+        // Typing
+        function showTyping() {
+            document.getElementById('typing').style.display = 'block';
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        }
+
+        function hideTyping() {
+            document.getElementById('typing').style.display = 'none';
+        }
+
+        // Send
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            input.value = '';
+            addMessage(message, true);
+            showTyping();
+
+            try {
+                const reply = await askShivox(message);
+                hideTyping();
+                addMessage(reply, false);
+            } catch (error) {
+                hideTyping();
+                addMessage("I encountered an error. Please try again.", false);
+            }
+        }
+
+        function quickAsk(question) {
+            document.getElementById('userInput').value = question;
+            sendMessage();
+        }
+
+        function clearChat() {
+            document.getElementById('messages').innerHTML = '';
+            chatHistory = [];
+            
+            const div = document.createElement('div');
+            div.className = 'message message-bot';
+            div.innerHTML = `
+                <div class="msg-label">${ABOUT_INFO.name}</div>
+                <div class="msg-content">Conversation cleared. How can I help you?</div>
+            `;
+            document.getElementById('messages').appendChild(div);
+        }
+
+        // Events
+        document.getElementById('sendBtn').addEventListener('click', sendMessage);
+        document.getElementById('userInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
